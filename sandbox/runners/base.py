@@ -22,6 +22,8 @@ from typing import Dict, List, Optional
 
 import psutil
 import structlog
+import platform
+import resource
 
 from sandbox.configs.run_config import RunConfig
 from sandbox.runners.isolation import tmp_cgroup, tmp_netns, tmp_overlayfs
@@ -110,6 +112,13 @@ async def run_commands(compile_command: Optional[str], run_command: str, cwd: st
 
             def preexec_fn():
                 os.setuid(kwargs.get('set_uid'))
+
+        # Apply memory limit using resource module
+        maximum_memory_bytes = args.memory_limit_MB * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (maximum_memory_bytes, maximum_memory_bytes))
+        resource.setrlimit(resource.RLIMIT_DATA, (maximum_memory_bytes, maximum_memory_bytes))
+        if platform.uname().system != "Darwin":
+            resource.setrlimit(resource.RLIMIT_STACK, (maximum_memory_bytes, maximum_memory_bytes))
 
         if compile_command is not None:
             compile_res = await run_command_bare(compile_command,
